@@ -1,0 +1,57 @@
+<main>
+    <ul id="todoList">
+    </ul>
+    <form id="createTusk">
+        <textarea name="" id="" cols="30" rows="10"></textarea>
+        <input type="submit" value="create tusk">
+    </form>
+
+</main>
+
+<script>
+    let todoList = document.querySelector('#todoList');
+    function addTusk(tusks){
+        let li = document.createElement('li');
+        tusks.tusk.map((tusk)=>{
+            let liClone = li.cloneNode(true);
+            liClone.innerHTML = tusk;
+            todoList.append(liClone);
+        })
+    }
+
+    function upgradeList(text){
+        let li = document.createElement('li');
+        li.innerHTML = text.value;
+        todoList.append(li);
+        text.value = '';
+    }
+
+    fetch("http://127.168.0.1:8080/index", {
+        headers: {
+            getDate: ((date) => `${date.getDate()}.${date.getMonth() + 1}.${date.getFullYear()}`)(new Date()),
+        }
+    })
+        .then(res => res.json())
+        .then(res => addTusk(res));
+
+
+    let form = document.querySelector('#createTusk');
+    form.onsubmit = async (e) => {
+        e.preventDefault();
+
+        let textArea = form.querySelector('textarea')
+        if(!textArea.value.replace(/\s+/g, '').length) return;
+
+        var body = {
+            newTusk: textArea.value,
+            currentDate: ((date)=>{return `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`})(new Date())
+        }
+        fetch("http://127.168.0.1:8080/index", {
+            method: 'POST',
+            'Content-Type': 'text/plain ',
+            body: JSON.stringify(body),
+        })
+            .then(response => upgradeList(textArea));
+    };
+
+</script>
