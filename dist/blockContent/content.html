@@ -265,5 +265,15 @@
         })
             .then(response => upgradeList(textArea));
     };
+    showDay.addEventListener('click', (e)=> {
+        let el = e.target.getAttribute('data-day');
+        let newDay = showDay.children[1].innerHTML;
+        if(el == 'afterDay'){
+            console.log('++')
+        }else if(el == 'beforeDay'){
+            console.log('--')
+        }
+    })
+
 
 </script>
