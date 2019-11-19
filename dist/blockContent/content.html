@@ -1,30 +1,193 @@
-<main>
-    <ul id="todoList">
-    </ul>
+<div class="main">
+    <h1>TO-DO LIST</h1>
     <form id="createTusk">
-        <textarea name="" id="" cols="30" rows="10"></textarea>
-        <input type="submit" value="create tusk">
+        <input type="text" placeholder="new task" name="task">
+        <button  type="submit"><strong>ADD</strong></button>
     </form>
+    <div id="showDay">
+        <div data-day="beforeDay"><</div>
+        <div></div>
+        <div data-day="afterDay">></div>
+    </div>
+    <div class="tasksBoard">
+        <ul id="todoList"></ul>
+        <a id="clear">Clear</a>
+    </div>
+</div>
 
-</main>
+<style>
+
+    html{
+        height: 100%;
+        background-image: linear-gradient(#ff6161,#ff768c);
+        background-repeat: no-repeat;
+        font-family: sans-serif;
+        color: #0f222d;
+        background-size: auto;
+    }
+    .main{
+        width: 400px;
+        display: flex;
+        justify-content: center;
+        flex-direction: column;
+        margin: auto;
+    }
+    h1{
+        text-align: center;
+        color: #fff;
+    }
+    form{
+        background-color: #fff;
+        padding: 15px;
+    }
+    input[type="text"]{
+        width: 310px;
+        height: 30px;
+        outline: 0;
+        border: none;
+        font-size: 1.5em;
+        background: #fff;
+        color: #2f4f4f;
+    }
+    button{
+        font-size: 1.5em;
+        color: #53BDFF;
+        background-color: #fff;
+        outline: 0;
+        border: none;
+        cursor: pointer;
+        width: 50px;
+
+    }
+    .tasksBoard{
+        background-color: #fff;
+        padding-top: 10px;
+        padding-bottom: 10px;
+        padding-right: 40px;
+        /*display: none;*/
+
+    }
+    ul{
+        list-style: none;
+    }
+    li{
+        border-bottom: 1px solid #53BDFF;
+        padding-bottom: 15px;
+        padding-top: 15px;
+        font-size: 1.3em;
+        text-align: center;
+        color: #2f4f4f;
+    }
+    li .text{
+        cursor: pointer;
+    }
+    li .text.done{
+        text-decoration: line-through;
+    }
+    a{
+        float: right;
+        text-align: right;
+        color: #ff6161;
+        font-size: 1.2em;
+        cursor: pointer;
+    }
+    .delete{
+        background-color: #ff6161;
+        padding: 0px 10px;
+        color: #fff;
+        display: block;
+        float: right;
+        cursor: pointer;
+        border-radius: 50%;
+    }
+    #showDay{
+        height: 30px;
+        display: flex;
+        flex-flow:row nowrap;
+    }
+    #showDay>div{
+        text-align: center;
+        line-height: 30px;
+    }
+    #showDay>div:nth-child(odd){
+        cursor: pointer;
+        font-size: 30px;
+        width: 20%;
+    }
+    #showDay>div:nth-child(odd):hover{
+        background-color: red;
+    }
+    #showDay>div:nth-child(even){
+        width: 100%;
+    }
+
+    @media (max-width: 500px) {
+        .main{
+            margin: auto;
+            width: 100%;
+        }
+        input[type="text"]{
+            width: 80%;
+        }
+        button{
+            width: 10%;
+        }
+    }
+</style>
 
 <script>
     let todoList = document.querySelector('#todoList');
-    function addTusk(tusks){
-        let li = document.createElement('li');
-        tusks.tusk.map((tusk)=>{
-            let liClone = li.cloneNode(true);
-            liClone.innerHTML = tusk;
-            todoList.append(liClone);
-        })
+    let showDay = document.querySelector('#showDay');
+    let curDate = ((date)=> `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`)(new Date());
+
+    function notTusk(data) {
+        if (!todoList.children.length) {
+            let li = document.createElement('li');
+            li.setAttribute('data-defaulted', 'true')
+            li.innerHTML = data.tusk[0].text;
+            todoList.append(li);
+        }
     }
 
-    function upgradeList(text){
+    function showDate (date){
+        showDay.children[1].innerHTML = date;
+    };
+
+
+    function addTusk(tusks){
         let li = document.createElement('li');
-        li.innerHTML = text.value;
-        todoList.append(li);
-        text.value = '';
+        if(tusks.tusk[0].defaulted){
+            li.innerHTML = tusks.tusk[0].text;
+            li.setAttribute('data-defaulted', 'true');
+            todoList.append(li);
+            return;
+        }
+        tusks.tusk.map((tusk)=>{
+            let liClone = li.cloneNode(true);
+            let isDone = tusk.done?'done':'';
+            liClone.innerHTML = `<span class="delete">×</span><span class="text ${isDone}">${tusk.text}</span>`;
+            todoList.append(liClone);
+            return;
+        })
     }
+    document.querySelector('#clear').addEventListener('click',(e)=> {
+        let reqBody = {
+            do: "clear",
+            currentDate: ((date)=>{return `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`})(new Date())
+        }
+        fetch("http://127.168.0.1:8080/index",{
+            method: 'POST',
+            body: JSON.stringify(reqBody)
+        })
+            .then(res=> res.json())
+            .then(res=> {
+                Array.from(todoList.children).map(item=> item.remove());
+                let li = document.createElement('li');
+                li.innerHTML = res.tusk[0].text;
+                li.setAttribute('data-defaulted', 'true');
+                todoList.append(li);
+            });
+    })
 
     fetch("http://127.168.0.1:8080/index", {
         headers: {
@@ -32,19 +195,68 @@
         }
     })
         .then(res => res.json())
-        .then(res => addTusk(res));
+        .then(res => addTusk(res))
+        .then(()=> showDate(curDate));
+
+    todoList.addEventListener('click', (e)=> {
+        if(e.target.classList.contains('text')){
+            e.target.classList.toggle("done");
+            let reqBody = {
+                do: "isDone",
+                id: Array.from(e.currentTarget.children).indexOf(e.target.parentNode),
+                done: e.target.classList.contains("done"),
+                currentDate: ((date)=>{return `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`})(new Date())
+            }
+            fetch("http://127.168.0.1:8080/index",{
+                 method: 'POST',
+                 body: JSON.stringify(reqBody)
+            });
+        }else if(e.target.classList.contains('delete')){
+            let reqBody = {
+                do: "delete",
+                id: Array.from(e.currentTarget.children).indexOf(e.target.parentNode),
+                currentDate: ((date)=>{return `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`})(new Date())
+            }
+            fetch("http://127.168.0.1:8080/index",{
+                method: 'POST',
+                body: JSON.stringify(reqBody)
+            })
+                .then(res => res.json())
+                .then(res => {
+                    e.target.parentNode.remove();
+                    notTusk(res);
+                });
+        }
+    })
+
+    function isDone(el) {
+
+    }
+
+    function upgradeList(text){
+        if (todoList.children[0].hasAttribute('data-defaulted')) {
+            todoList.children[0].remove();
+        }
+        let li = document.createElement('li');
+        li.innerHTML = `<span class="delete">×</span><span class="text">${text.value}</span>`;
+        todoList.append(li);
+        text.value = '';
+    }
 
 
     let form = document.querySelector('#createTusk');
     form.onsubmit = async (e) => {
         e.preventDefault();
 
-        let textArea = form.querySelector('textarea')
+        let textArea = form.querySelector('input')
         if(!textArea.value.replace(/\s+/g, '').length) return;
 
         var body = {
-            newTusk: textArea.value,
-            currentDate: ((date)=>{return `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`})(new Date())
+            newTusk: {
+                text: textArea.value,
+                done: false
+            },
+            currentDate: ((date)=>{return `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`})(new Date()),
         }
         fetch("http://127.168.0.1:8080/index", {
             method: 'POST',
