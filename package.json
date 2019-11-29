@@ -1,11 +1,23 @@
 {
   "name": "kurs",
   "version": "1.0.0",
-  "description": "",
   "main": "app.js",
   "scripts": {
     "test": "run"
   },
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vitaliyeb/todoList.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vitaliyeb/todoList/issues"
+  },
+  "homepage": "https://github.com/vitaliyeb/todoList#readme",
+  "description": "",
+  "dependencies": {
+    "cowsay": "^1.4.0",
+    "express": "^4.17.1"
+  }
 }

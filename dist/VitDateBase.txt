@@ -1,1 +1,1 @@
-[{"date":"19.11.2019","tusk":[{"text":"test","done":false}],"done":false}]
+[{"date":"28.11.2019","tusk":[{"tuskValue":"saasd","tuskDone":false},{"tuskValue":"SCZX","tuskDone":false}]},{"date":"29.11.2019","tusk":[{"tuskValue":"sacsa","tuskDone":false}]}]

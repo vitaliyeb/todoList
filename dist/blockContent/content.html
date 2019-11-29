@@ -1,8 +1,8 @@
 <div class="main">
     <h1>TO-DO LIST</h1>
-    <form id="createTusk">
+    <form data-event="addTusk" id="createTusk">
         <input type="text" placeholder="new task" name="task">
-        <button  type="submit"><strong>ADD</strong></button>
+        <button style="color:red;font-size:120%"  type="submit"><strong>ADD</strong></button>
     </form>
     <div id="showDay">
         <div data-day="beforeDay"><</div>
@@ -11,7 +11,7 @@
     </div>
     <div class="tasksBoard">
         <ul id="todoList"></ul>
-        <a id="clear">Clear</a>
+        <a id="clear" data-event="clear">Clear</a>
     </div>
 </div>
 
@@ -136,144 +136,226 @@
 </style>
 
 <script>
-    let todoList = document.querySelector('#todoList');
-    let showDay = document.querySelector('#showDay');
-    let curDate = ((date)=> `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`)(new Date());
-
-    function notTusk(data) {
-        if (!todoList.children.length) {
-            let li = document.createElement('li');
-            li.setAttribute('data-defaulted', 'true')
-            li.innerHTML = data.tusk[0].text;
-            todoList.append(li);
+    class Todo {
+        constructor(){
+            this.todoListElement    = document.querySelector('#todoList');
+            this.showDayElement     = document.querySelector('#showDay');
+            this.clearElement       = document.querySelector('#clear');
+            this.formElement        = document.querySelector('#createTusk');
+            this.curDate            = Date.now();
+            this.newTusk    = function (tuskValue, tuskDone, reqDate, thisDo) {
+                this.tusk = {
+                    tuskValue  : tuskValue,
+                    tuskDone   : tuskDone,
+                },
+                this.reqDate   = reqDate,
+                this.do = thisDo
+            };
+            [this.showDayElement, this.clearElement, this.todoListElement].map(element => element.addEventListener('click', this.eventPlay.bind(this)));
+            this.formElement.addEventListener('submit', this.eventPlay);
         }
-    }
-
-    function showDate (date){
-        showDay.children[1].innerHTML = date;
-    };
-
-
-    function addTusk(tusks){
-        let li = document.createElement('li');
-        if(tusks.tusk[0].defaulted){
-            li.innerHTML = tusks.tusk[0].text;
-            li.setAttribute('data-defaulted', 'true');
-            todoList.append(li);
-            return;
-        }
-        tusks.tusk.map((tusk)=>{
-            let liClone = li.cloneNode(true);
-            let isDone = tusk.done?'done':'';
-            liClone.innerHTML = `<span class="delete">×</span><span class="text ${isDone}">${tusk.text}</span>`;
-            todoList.append(liClone);
-            return;
-        })
-    }
-    document.querySelector('#clear').addEventListener('click',(e)=> {
-        let reqBody = {
-            do: "clear",
-            currentDate: ((date)=>{return `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`})(new Date())
-        }
-        fetch("http://127.168.0.1:8080/index",{
-            method: 'POST',
-            body: JSON.stringify(reqBody)
-        })
-            .then(res=> res.json())
-            .then(res=> {
-                Array.from(todoList.children).map(item=> item.remove());
-                let li = document.createElement('li');
-                li.innerHTML = res.tusk[0].text;
-                li.setAttribute('data-defaulted', 'true');
-                todoList.append(li);
-            });
-    })
-
-    fetch("http://127.168.0.1:8080/index", {
-        headers: {
-            getDate: ((date) => `${date.getDate()}.${date.getMonth() + 1}.${date.getFullYear()}`)(new Date()),
-        }
-    })
-        .then(res => res.json())
-        .then(res => addTusk(res))
-        .then(()=> showDate(curDate));
-
-    todoList.addEventListener('click', (e)=> {
-        if(e.target.classList.contains('text')){
-            e.target.classList.toggle("done");
-            let reqBody = {
-                do: "isDone",
-                id: Array.from(e.currentTarget.children).indexOf(e.target.parentNode),
-                done: e.target.classList.contains("done"),
-                currentDate: ((date)=>{return `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`})(new Date())
+        eventPlay = (e)=> {
+            e.stopPropagation();
+            e.preventDefault();
+            switch (e.target.getAttribute('data-event')) {
+                case 'addTusk':
+                    this.createTusk(e);
+                    break;
+                case 'clear':
+                    this.clear();
+                    break;
             }
-            fetch("http://127.168.0.1:8080/index",{
-                 method: 'POST',
-                 body: JSON.stringify(reqBody)
-            });
-        }else if(e.target.classList.contains('delete')){
-            let reqBody = {
-                do: "delete",
-                id: Array.from(e.currentTarget.children).indexOf(e.target.parentNode),
-                currentDate: ((date)=>{return `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`})(new Date())
-            }
+        }
+        createTusk(e){
+            e.preventDefault();
+            let textArea = this.formElement.querySelector('input')
+            if(!textArea.value.replace(/\s+/g, '').length) return;
+            this.addTusk(textArea);
+        }
+        addTusk(text){
+            let reqBody = new this.newTusk(text.value, false, this.convertDate(this.curDate), 'addTusk');
+            text.value = "";
             fetch("http://127.168.0.1:8080/index",{
                 method: 'POST',
                 body: JSON.stringify(reqBody)
             })
-                .then(res => res.json())
-                .then(res => {
-                    e.target.parentNode.remove();
-                    notTusk(res);
-                });
+                .then(()=> this.showTusk(reqBody));
         }
-    })
-
-    function isDone(el) {
-
+        noTusk(){
+            let notTusk = document.createElement('li');
+            notTusk.innerHTML = `У вас нет задач на этот день`;
+            notTusk.setAttribute('data-defaulted', 'true');
+            this.todoListElement.append(notTusk);
+        }
+        showTusk(tusk){
+            let li = document.createElement('li'),
+                isDone = tusk.done?'done':'';
+            li.innerHTML = `<span class="delete">×</span><span class="text ${isDone}">${tusk.tuskValue}</span>`;
+            this.todoListElement.append(li);
+        }
+        clear() {
+            fetch("http://127.168.0.1:8080/index",{
+                method: 'POST',
+                body: JSON.stringify({"do": "clear", "reqDate": this.convertDate(this.curDate)})
+            })
+        }
+        convertDate (dateMs) {
+            let date = new Date(dateMs);
+            return `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`;
+        }
+        getTuskDay(time){
+            fetch('http://127.168.0.1:8080/index',{
+                headers: {
+                    'getTuskDay': time
+                }
+            })
+                .then(response => response.json())
+                .then(tusks => {
+                    if(tusks.tusk[0].defaulted) return this.noTusk();
+                    tusks.tusk.map((tusk)=> this.showTusk(tusk));
+                })
+        }
     }
 
-    function upgradeList(text){
-        if (todoList.children[0].hasAttribute('data-defaulted')) {
-            todoList.children[0].remove();
-        }
-        let li = document.createElement('li');
-        li.innerHTML = `<span class="delete">×</span><span class="text">${text.value}</span>`;
-        todoList.append(li);
-        text.value = '';
-    }
+    let r = new Todo();
+    r.getTuskDay(r.convertDate(Date.now()));
 
 
-    let form = document.querySelector('#createTusk');
-    form.onsubmit = async (e) => {
-        e.preventDefault();
 
-        let textArea = form.querySelector('input')
-        if(!textArea.value.replace(/\s+/g, '').length) return;
-
-        var body = {
-            newTusk: {
-                text: textArea.value,
-                done: false
-            },
-            currentDate: ((date)=>{return `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`})(new Date()),
-        }
-        fetch("http://127.168.0.1:8080/index", {
-            method: 'POST',
-            'Content-Type': 'text/plain ',
-            body: JSON.stringify(body),
-        })
-            .then(response => upgradeList(textArea));
-    };
-    showDay.addEventListener('click', (e)=> {
-        let el = e.target.getAttribute('data-day');
-        let newDay = showDay.children[1].innerHTML;
-        if(el == 'afterDay'){
-            console.log('++')
-        }else if(el == 'beforeDay'){
-            console.log('--')
-        }
-    })
+    // let todoList = document.querySelector('#todoList');
+    // let showDay = document.querySelector('#showDay');
+    // let curDate = ((date)=> `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`)(new Date());
+    //
+    // function notTusk(data) {
+    //     if (!todoList.children.length) {
+    //         let li = document.createElement('li');
+    //         li.setAttribute('data-defaulted', 'true')
+    //         li.innerHTML = data.tusk[0].text;
+    //         todoList.append(li);
+    //     }
+    // }
+    //
+    // function showDate (date){
+    //     showDay.children[1].innerHTML = date;
+    // };
+    //
+    //
+    // function addTusk(tusks){
+    //     let li = document.createElement('li');
+    //     if(tusks.tusk[0].defaulted){
+    //         li.innerHTML = tusks.tusk[0].text;
+    //         li.setAttribute('data-defaulted', 'true');
+    //         todoList.append(li);
+    //         return;
+    //     }
+    //     tusks.tusk.map((tusk)=>{
+    //         let liClone = li.cloneNode(true);
+    //         let isDone = tusk.done?'done':'';
+    //         liClone.innerHTML = `<span class="delete">×</span><span class="text ${isDone}">${tusk.text}</span>`;
+    //         todoList.append(liClone);
+    //         return;
+    //     })
+    // }
+    // document.querySelector('#clear').addEventListener('click',(e)=> {
+    //     let reqBody = {
+    //         do: "clear",
+    //         currentDate: ((date)=>{return `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`})(new Date())
+    //     }
+    //     fetch("http://127.168.0.1:8080/index",{
+    //         method: 'POST',
+    //         body: JSON.stringify(reqBody)
+    //     })
+    //         .then(res=> res.json())
+    //         .then(res=> {
+    //             Array.from(todoList.children).map(item=> item.remove());
+    //             let li = document.createElement('li');
+    //             li.innerHTML = res.tusk[0].text;
+    //             li.setAttribute('data-defaulted', 'true');
+    //             todoList.append(li);
+    //         });
+    // })
+    //
+    // fetch("http://127.168.0.1:8080/index", {
+    //     headers: {
+    //         getDate: ((date) => `${date.getDate()}.${date.getMonth() + 1}.${date.getFullYear()}`)(new Date()),
+    //     }
+    // })
+    //     .then(res => res.json())
+    //     .then(res => addTusk(res))
+    //     .then(()=> showDate(curDate));
+    //
+    // todoList.addEventListener('click', (e)=> {
+    //     if(e.target.classList.contains('text')){
+    //         e.target.classList.toggle("done");
+    //         let reqBody = {
+    //             do: "isDone",
+    //             id: Array.from(e.currentTarget.children).indexOf(e.target.parentNode),
+    //             done: e.target.classList.contains("done"),
+    //             currentDate: ((date)=>{return `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`})(new Date())
+    //         }
+    //         fetch("http://127.168.0.1:8080/index",{
+    //              method: 'POST',
+    //              body: JSON.stringify(reqBody)
+    //         });
+    //     }else if(e.target.classList.contains('delete')){
+    //         let reqBody = {
+    //             do: "delete",
+    //             id: Array.from(e.currentTarget.children).indexOf(e.target.parentNode),
+    //             currentDate: ((date)=>{return `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`})(new Date())
+    //         }
+    //         fetch("http://127.168.0.1:8080/index",{
+    //             method: 'POST',
+    //             body: JSON.stringify(reqBody)
+    //         })
+    //             .then(res => res.json())
+    //             .then(res => {
+    //                 e.target.parentNode.remove();
+    //                 notTusk(res);
+    //             });
+    //     }
+    // })
+    //
+    // function upgradeList(text){
+    //     if (todoList.children[0].hasAttribute('data-defaulted')) {
+    //         todoList.children[0].remove();
+    //     }
+    //     let li = document.createElement('li');
+    //     li.innerHTML = `<span class="delete">×</span><span class="text">${text.value}</span>`;
+    //     todoList.append(li);
+    //     text.value = '';
+    // }
+    //
+    //
+    // let form = document.querySelector('#createTusk');
+    // form.onsubmit = async (e) => {
+    //     e.preventDefault();
+    //
+    //     let textArea = form.querySelector('input')
+    //     if(!textArea.value.replace(/\s+/g, '').length) return;
+    //
+    //     var body = {
+    //         newTusk: {
+    //             text: textArea.value,
+    //             done: false
+    //         },
+    //         currentDate: ((date)=>{return `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`})(new Date()),
+    //     }
+    //     fetch("http://127.168.0.1:8080/index", {
+    //         method: 'POST',
+    //         'Content-Type': 'text/plain ',
+    //         body: JSON.stringify(body),
+    //     })
+    //         .then(response => upgradeList(textArea));
+    // };
+    // showDay.addEventListener('click', (e)=> {
+    //     let el = e.target.getAttribute('data-day');
+    //     let newDay = showDay.children[1].innerHTML;
+    //     if(el == 'afterDay'){
+    //         console.log('++')
+    //     }else if(el == 'beforeDay'){
+    //         console.log('--')
+    //     }
+    // })
 
 
 </script>

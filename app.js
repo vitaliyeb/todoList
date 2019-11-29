@@ -20,10 +20,9 @@ const router = function() {
 }();
 
 const VitDB = function () {
-    let createDayTusk =  function (obj) {
-        this.date = obj.currentDate;
-        this.tusk = [obj.newTusk];
-        this.done = false;
+    let createDayTusk =  function (obj, date) {
+        this.date = date;
+        this.tusk = [obj];
     }
     return {
         readVDB: function (){
@@ -32,7 +31,7 @@ const VitDB = function () {
         DBInit: function (req, res) {
             if(req.method === "GET"){
                 let arrVDB = JSON.parse(this.readVDB());
-                let currentItem = arrVDB.find((item)=> item.date == req.headers.getdate);
+                let currentItem = arrVDB.find((item)=> item.date == req.headers.gettuskday);
                 if(!!currentItem && !!currentItem.tusk.length){
                     return this.retResponse(res, JSON.stringify(currentItem))
                 }
@@ -45,22 +44,35 @@ const VitDB = function () {
                 req.on('end', ()=>{
                     data = JSON.parse(data);
                     let arrVDB = Array.from(JSON.parse(this.readVDB()));
+                    let currentItem = arrVDB.find((item)=> item.date == data.reqDate);
+                    console.log(data)
 
-                    let currentItem = arrVDB.find((item)=> item.date == data.currentDate);
+                    switch (data.do) {
+                        case 'addTusk':
+                            if(!!currentItem){
+                                currentItem.tusk.push(data.tusk);
+                            }else{
+                                arrVDB.push(new createDayTusk(data.tusk, data.reqDate))
+                            }
+                            break;
+                        case 'clear':
 
-                    if(data.do == 'isDone'){
-                            currentItem.tusk[data.id].done = data.done;
-                     }else if(data.do == 'delete'){
-                            currentItem.tusk.splice(data.id, 1);
-                    }else if(data.do == 'clear'){
-                        arrVDB.splice(arrVDB.indexOf(currentItem), 1);
-                    }else{
-                        if(!currentItem){
-                            arrVDB.push(new createDayTusk(data));
-                        }else {
-                            currentItem.tusk.push(data.newTusk);
-                        }
                     }
+
+                    // if(data.do == 'isDone'){
+                    //         currentItem.tusk[data.id].done = data.done;
+                    //  }else if(data.do == 'delete'){
+                    //         currentItem.tusk.splice(data.id, 1);
+                    // }else if(data.do == 'clear'){
+                    //     arrVDB.splice(arrVDB.indexOf(currentItem), 1);
+                    // }else{
+                    //     if(!currentItem){
+                    //         arrVDB.push(new createDayTusk(data));
+                    //     }else {
+                    //         currentItem.tusk.push(data.tuskValue);
+                    //     }
+                    // }
+                    console.log(arrVDB);
                     fs.writeFileSync(`./dist/VitDateBase.txt`, JSON.stringify(arrVDB));
                     this.retResponse(res);
                 });
