@@ -1,13 +1,12 @@
 <div class="main">
-    <h1>TO-DO LIST</h1>
     <form data-event="addTusk" id="createTusk">
         <input type="text" placeholder="new task" name="task">
         <button style="color:red;font-size:120%"  type="submit"><strong>ADD</strong></button>
     </form>
     <div id="showDay">
-        <div data-day="beforeDay"><</div>
-        <div></div>
-        <div data-day="afterDay">></div>
+        <div data-event="beforeDay"><</div>
+        <div data-day="day"></div>
+        <div data-event="afterDay">></div>
     </div>
     <div class="tasksBoard">
         <ul id="todoList"></ul>
@@ -25,6 +24,9 @@
         color: #0f222d;
         background-size: auto;
     }
+    body{
+        overflow: hidden;
+    }
     .main{
         width: 400px;
         display: flex;
@@ -38,14 +40,15 @@
     }
     form{
         background-color: #fff;
-        padding: 15px;
+        display: flex;
+        padding: 7px;
     }
     input[type="text"]{
-        width: 310px;
+        width: 100%;
         height: 30px;
         outline: 0;
         border: none;
-        font-size: 1.5em;
+        font-size: 16px;
         background: #fff;
         color: #2f4f4f;
     }
@@ -61,28 +64,51 @@
     }
     .tasksBoard{
         background-color: #fff;
-        padding-top: 10px;
-        padding-bottom: 10px;
-        padding-right: 40px;
-        /*display: none;*/
-
+        padding: 10px;
     }
     ul{
         list-style: none;
+        margin: 0;
+        max-height: 200px;
+        overflow: auto;
+        padding: 0;
+    }
+    ul::-webkit-scrollbar{
+        width: 5px;
+        background-color: #9d89893b;
+        border-radius: 5px;
+    }
+    ul::-webkit-scrollbar-thumb{
+        background-color: #ff61619e;
+        border-radius: 5px;
     }
     li{
         border-bottom: 1px solid #53BDFF;
-        padding-bottom: 15px;
-        padding-top: 15px;
+        padding: 10px 10px 10px 0;
+        display: flex;
+        align-items: center;
         font-size: 1.3em;
         text-align: center;
         color: #2f4f4f;
     }
     li .text{
         cursor: pointer;
+        width: 100%;
+        max-height: 41px;
+        font-size: 16px;
+        overflow: hidden;
+        box-sizing: border-box;
+        word-break: break-word;
+        text-overflow: ellipsis;
+        padding: 0 5px;
+        text-align: left;
+        display: block;
     }
     li .text.done{
         text-decoration: line-through;
+    }
+    li[data-defaulted]{
+        font-size: 16px;
     }
     a{
         float: right;
@@ -93,9 +119,11 @@
     }
     .delete{
         background-color: #ff6161;
-        padding: 0px 10px;
+        padding: 0px 6px;
         color: #fff;
         display: block;
+        height: 20px;
+        line-height: 21px;
         float: right;
         cursor: pointer;
         border-radius: 50%;
@@ -143,6 +171,7 @@
             this.clearElement       = document.querySelector('#clear');
             this.formElement        = document.querySelector('#createTusk');
             this.curDate            = Date.now();
+            this.oneDay             = 86400000;
             this.newTusk    = function (tuskValue, tuskDone, reqDate, thisDo) {
                 this.tusk = {
                     tuskValue  : tuskValue,
@@ -161,8 +190,20 @@
                 case 'addTusk':
                     this.createTusk(e);
                     break;
+                case 'deletedTusk':
+                    this.deletedTusk(e);
+                    break;
                 case 'clear':
                     this.clear();
+                    break;
+                case "isDone":
+                    this.isDone(e);
+                    break;
+                case "beforeDay":
+                    this.beforeDay(e);
+                    break;
+                case "afterDay":
+                    this.afterDay(e);
                     break;
             }
         }
@@ -179,31 +220,75 @@
                 method: 'POST',
                 body: JSON.stringify(reqBody)
             })
-                .then(()=> this.showTusk(reqBody));
+                .then(()=> this.isFirstDefault())
+                .then((first)=> this.firstDelete(first))
+                .then(()=> this.showTusk(reqBody.tusk));
+        }
+        firstDelete(first){
+            if(first) return this.todoListElement.children[0].remove();
         }
         noTusk(){
             let notTusk = document.createElement('li');
-            notTusk.innerHTML = `У вас нет задач на этот день`;
+            notTusk.innerHTML = `Вы ничего не запланировали`;
             notTusk.setAttribute('data-defaulted', 'true');
             this.todoListElement.append(notTusk);
         }
         showTusk(tusk){
             let li = document.createElement('li'),
                 isDone = tusk.done?'done':'';
-            li.innerHTML = `<span class="delete">×</span><span class="text ${isDone}">${tusk.tuskValue}</span>`;
+            li.innerHTML = `<span data-event="isDone" class="text ${isDone}">${tusk.tuskValue}</span><span class="delete" data-event="deletedTusk">×</span>`;
             this.todoListElement.append(li);
         }
+        isFirstDefault(){
+            return this.todoListElement.children[0].hasAttribute('data-defaulted');
+        }
+        getIndexElement(e){
+            let index = 0;
+            Array.from(this.todoListElement.children).find((element, i) => {
+                index = i;
+                return element == e.target.parentElement
+            });
+            return index;
+        }
+        deletedTusk(e){
+            let index = this.getIndexElement(e);
+            fetch("http://127.168.0.1:8080/index",{
+                method: 'POST',
+                body: JSON.stringify({"do": "deletedTusk", "reqDate": this.convertDate(this.curDate), index: index})
+            })
+                .then(()=> {
+                    this.todoListElement.children[index].remove()
+                    if(!this.todoListElement.children.length) this.noTusk();
+                })
+        }
+        isDone(e){
+            let index = this.getIndexElement(e),
+                done = e.target.classList.contains("done");
+            fetch("http://127.168.0.1:8080/index",{
+                method: 'POST',
+                body: JSON.stringify({"do": "isDone", "reqDate": this.convertDate(this.curDate),done: !done, index: index})
+            })
+                .then(()=> e.target.classList.toggle('done'));
+
+        }
         clear() {
+            if(this.isFirstDefault()) return;
             fetch("http://127.168.0.1:8080/index",{
                 method: 'POST',
                 body: JSON.stringify({"do": "clear", "reqDate": this.convertDate(this.curDate)})
             })
+                .then(()=> this.removeTusksElement())
+                .then(tusk => this.noTusk())
+        }
+        removeTusksElement(){
+            Array.from(this.todoListElement.children).map(element => element.remove());
         }
         convertDate (dateMs) {
             let date = new Date(dateMs);
             return `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`;
         }
         getTuskDay(time){
+            this.setDay(time);
             fetch('http://127.168.0.1:8080/index',{
                 headers: {
                     'getTuskDay': time
@@ -215,147 +300,21 @@
                     tusks.tusk.map((tusk)=> this.showTusk(tusk));
                 })
         }
+        beforeDay(){
+            this.curDate = this.curDate-this.oneDay;
+            this.removeTusksElement();
+            this.getTuskDay(this.convertDate(this.curDate))
+        }
+        afterDay(){
+            this.curDate = this.curDate+this.oneDay;
+            this.removeTusksElement();
+            this.getTuskDay(this.convertDate(this.curDate))
+        }
+        setDay(day){
+            this.showDayElement.querySelector("[data-day=day]").innerHTML = day;
+        }
     }
 
-    let r = new Todo();
-    r.getTuskDay(r.convertDate(Date.now()));
-
-
-
-    // let todoList = document.querySelector('#todoList');
-    // let showDay = document.querySelector('#showDay');
-    // let curDate = ((date)=> `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`)(new Date());
-    //
-    // function notTusk(data) {
-    //     if (!todoList.children.length) {
-    //         let li = document.createElement('li');
-    //         li.setAttribute('data-defaulted', 'true')
-    //         li.innerHTML = data.tusk[0].text;
-    //         todoList.append(li);
-    //     }
-    // }
-    //
-    // function showDate (date){
-    //     showDay.children[1].innerHTML = date;
-    // };
-    //
-    //
-    // function addTusk(tusks){
-    //     let li = document.createElement('li');
-    //     if(tusks.tusk[0].defaulted){
-    //         li.innerHTML = tusks.tusk[0].text;
-    //         li.setAttribute('data-defaulted', 'true');
-    //         todoList.append(li);
-    //         return;
-    //     }
-    //     tusks.tusk.map((tusk)=>{
-    //         let liClone = li.cloneNode(true);
-    //         let isDone = tusk.done?'done':'';
-    //         liClone.innerHTML = `<span class="delete">×</span><span class="text ${isDone}">${tusk.text}</span>`;
-    //         todoList.append(liClone);
-    //         return;
-    //     })
-    // }
-    // document.querySelector('#clear').addEventListener('click',(e)=> {
-    //     let reqBody = {
-    //         do: "clear",
-    //         currentDate: ((date)=>{return `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`})(new Date())
-    //     }
-    //     fetch("http://127.168.0.1:8080/index",{
-    //         method: 'POST',
-    //         body: JSON.stringify(reqBody)
-    //     })
-    //         .then(res=> res.json())
-    //         .then(res=> {
-    //             Array.from(todoList.children).map(item=> item.remove());
-    //             let li = document.createElement('li');
-    //             li.innerHTML = res.tusk[0].text;
-    //             li.setAttribute('data-defaulted', 'true');
-    //             todoList.append(li);
-    //         });
-    // })
-    //
-    // fetch("http://127.168.0.1:8080/index", {
-    //     headers: {
-    //         getDate: ((date) => `${date.getDate()}.${date.getMonth() + 1}.${date.getFullYear()}`)(new Date()),
-    //     }
-    // })
-    //     .then(res => res.json())
-    //     .then(res => addTusk(res))
-    //     .then(()=> showDate(curDate));
-    //
-    // todoList.addEventListener('click', (e)=> {
-    //     if(e.target.classList.contains('text')){
-    //         e.target.classList.toggle("done");
-    //         let reqBody = {
-    //             do: "isDone",
-    //             id: Array.from(e.currentTarget.children).indexOf(e.target.parentNode),
-    //             done: e.target.classList.contains("done"),
-    //             currentDate: ((date)=>{return `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`})(new Date())
-    //         }
-    //         fetch("http://127.168.0.1:8080/index",{
-    //              method: 'POST',
-    //              body: JSON.stringify(reqBody)
-    //         });
-    //     }else if(e.target.classList.contains('delete')){
-    //         let reqBody = {
-    //             do: "delete",
-    //             id: Array.from(e.currentTarget.children).indexOf(e.target.parentNode),
-    //             currentDate: ((date)=>{return `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`})(new Date())
-    //         }
-    //         fetch("http://127.168.0.1:8080/index",{
-    //             method: 'POST',
-    //             body: JSON.stringify(reqBody)
-    //         })
-    //             .then(res => res.json())
-    //             .then(res => {
-    //                 e.target.parentNode.remove();
-    //                 notTusk(res);
-    //             });
-    //     }
-    // })
-    //
-    // function upgradeList(text){
-    //     if (todoList.children[0].hasAttribute('data-defaulted')) {
-    //         todoList.children[0].remove();
-    //     }
-    //     let li = document.createElement('li');
-    //     li.innerHTML = `<span class="delete">×</span><span class="text">${text.value}</span>`;
-    //     todoList.append(li);
-    //     text.value = '';
-    // }
-    //
-    //
-    // let form = document.querySelector('#createTusk');
-    // form.onsubmit = async (e) => {
-    //     e.preventDefault();
-    //
-    //     let textArea = form.querySelector('input')
-    //     if(!textArea.value.replace(/\s+/g, '').length) return;
-    //
-    //     var body = {
-    //         newTusk: {
-    //             text: textArea.value,
-    //             done: false
-    //         },
-    //         currentDate: ((date)=>{return `${date.getDate()}.${date.getMonth()+1}.${date.getFullYear()}`})(new Date()),
-    //     }
-    //     fetch("http://127.168.0.1:8080/index", {
-    //         method: 'POST',
-    //         'Content-Type': 'text/plain ',
-    //         body: JSON.stringify(body),
-    //     })
-    //         .then(response => upgradeList(textArea));
-    // };
-    // showDay.addEventListener('click', (e)=> {
-    //     let el = e.target.getAttribute('data-day');
-    //     let newDay = showDay.children[1].innerHTML;
-    //     if(el == 'afterDay'){
-    //         console.log('++')
-    //     }else if(el == 'beforeDay'){
-    //         console.log('--')
-    //     }
-    // })
-
-
+    let todo = new Todo();
+    todo.getTuskDay(todo.convertDate(Date.now()));
 </script>

@@ -43,9 +43,12 @@ const VitDB = function () {
                 });
                 req.on('end', ()=>{
                     data = JSON.parse(data);
-                    let arrVDB = Array.from(JSON.parse(this.readVDB()));
-                    let currentItem = arrVDB.find((item)=> item.date == data.reqDate);
-                    console.log(data)
+                    let arrVDB = Array.from(JSON.parse(this.readVDB())),
+                        currentDayInex = 0,
+                        currentItem = arrVDB.find((item, i)=> {
+                            currentDayInex = i;
+                            return item.date == data.reqDate
+                        });
 
                     switch (data.do) {
                         case 'addTusk':
@@ -56,29 +59,21 @@ const VitDB = function () {
                             }
                             break;
                         case 'clear':
-
+                            if(!!currentItem) arrVDB.splice(currentDayInex, 1);
+                            break;
+                        case 'deletedTusk':
+                            if(!!currentItem) currentItem.tusk.splice(data.index, 1);
+                            break;
+                        case 'isDone':
+                            if(!!currentItem) currentItem.tusk[data.index].done = data.done;
+                            break;
                     }
-
-                    // if(data.do == 'isDone'){
-                    //         currentItem.tusk[data.id].done = data.done;
-                    //  }else if(data.do == 'delete'){
-                    //         currentItem.tusk.splice(data.id, 1);
-                    // }else if(data.do == 'clear'){
-                    //     arrVDB.splice(arrVDB.indexOf(currentItem), 1);
-                    // }else{
-                    //     if(!currentItem){
-                    //         arrVDB.push(new createDayTusk(data));
-                    //     }else {
-                    //         currentItem.tusk.push(data.tuskValue);
-                    //     }
-                    // }
-                    console.log(arrVDB);
                     fs.writeFileSync(`./dist/VitDateBase.txt`, JSON.stringify(arrVDB));
                     this.retResponse(res);
                 });
             }
         },
-        retResponse: function (response, data = '{"tusk":[{"text":"У вас нет задач на этот день", "defaulted": true}]}') {
+        retResponse: function (response, data = '{"tusk":[{"defaulted": true}]}') {
             response.write(data);
             response.end();
         }
